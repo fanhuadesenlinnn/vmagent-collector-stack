@@ -57,8 +57,6 @@ vm_admin / CAO-hengyuan89
 │   ├── vmagent.yml
 │   ├── blackbox.yml
 │   ├── snmp.yml
-│   ├── caddy-selfsigned.crt
-│   ├── caddy-selfsigned.key
 │   ├── .caddy-selfsigned.crt
 │   └── .caddy-selfsigned.key
 ├── targets
@@ -89,6 +87,8 @@ https://服务器IP:29088/snmp/      SNMP Exporter
 config/caddy-selfsigned.crt
 config/caddy-selfsigned.key
 ```
+
+这两个非隐藏文件是运行时生成文件，已加入 `.gitignore`，不会提交到仓库。
 
 如果离线机器没有 `openssl`，或证书生成失败，可以手动使用项目内置隐藏备用证书：
 
