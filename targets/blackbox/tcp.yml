@@ -1,0 +1,6 @@
+# TCP 端口连通性黑盒探测动态目标示例。
+- targets:
+    - example.com:443
+  labels:
+    group: public
+    module: tcp_connect

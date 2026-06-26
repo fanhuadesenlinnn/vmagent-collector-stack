@@ -1,0 +1,7 @@
+# SNMP 动态目标示例；默认不会真实可用，请替换为你的交换机/路由器 IP。
+- targets:
+    - 192.168.1.1
+  labels:
+    group: network
+    module: if_mib
+    auth: public_v2

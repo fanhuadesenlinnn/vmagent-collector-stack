@@ -1,0 +1,6 @@
+# ICMP 黑盒探测动态目标示例。
+- targets:
+    - 1.1.1.1
+  labels:
+    group: public
+    module: icmp

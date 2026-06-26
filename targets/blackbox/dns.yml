@@ -1,0 +1,6 @@
+# DNS 黑盒探测动态目标示例；target 是 DNS 服务器地址。
+- targets:
+    - 8.8.8.8:53
+  labels:
+    group: public
+    module: dns_udp

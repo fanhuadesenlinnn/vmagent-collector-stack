@@ -1,0 +1,132 @@
+# Blackbox Exporter 模块配置：覆盖官方常用 HTTP、TCP、ICMP、DNS、gRPC 等模块。
+# 修改后执行：./ops.sh reload
+
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      follow_redirects: true
+      preferred_ip_protocol: ip4
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+
+  http_post_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: POST
+      follow_redirects: true
+      preferred_ip_protocol: ip4
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+
+  http_2xx_ipv6:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      follow_redirects: true
+      preferred_ip_protocol: ip6
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+
+  http_2xx_strict_tls:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      follow_redirects: true
+      fail_if_not_ssl: true
+      preferred_ip_protocol: ip4
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+
+  tcp_tls_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      tls: true
+
+  ssh_banner:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      query_response:
+        - expect: "^SSH-2.0-"
+
+  pop3s_banner:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      tls: true
+      query_response:
+        - expect: "^\\+OK"
+
+  irc_banner:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      query_response:
+        - send: "NICK prober"
+        - send: "USER prober prober prober :prober"
+        - expect: "PING :([^ ]+)"
+          send: "PONG ${1}"
+        - expect: "^:[^ ]+ 001"
+
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: ip4
+
+  dns_udp:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: "example.com"
+      query_type: "A"
+      transport_protocol: "udp"
+      preferred_ip_protocol: "ip4"
+
+  dns_udp53:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: "example.com"
+      query_type: "A"
+      transport_protocol: "udp"
+      preferred_ip_protocol: "ip4"
+
+  dns_tcp:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: "example.com"
+      query_type: "A"
+      transport_protocol: "tcp"
+      preferred_ip_protocol: "ip4"
+
+  dns_soa:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: "example.com"
+      query_type: "SOA"
+      transport_protocol: "udp"
+      preferred_ip_protocol: "ip4"
+
+  grpc:
+    prober: grpc
+    timeout: 5s
+    grpc:
+      preferred_ip_protocol: ip4
+      tls: false
+
+  grpc_tls:
+    prober: grpc
+    timeout: 5s
+    grpc:
+      preferred_ip_protocol: ip4
+      tls: true

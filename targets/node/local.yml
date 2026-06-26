@@ -1,0 +1,7 @@
+# node-exporter 动态目标示例。
+# 本地 node-exporter 由 docker-compose 启动，地址是 node-exporter:9100。
+- targets:
+    - node-exporter:9100
+  labels:
+    group: local
+    role: monitor

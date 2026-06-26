@@ -1,0 +1,77 @@
+{
+    # 管理 API 只监听容器本地，方便 ./ops.sh reload 热加载 Caddyfile，不对外暴露。
+    admin localhost:2019
+    # 默认使用项目自带自签证书提供 HTTPS。
+    auto_https off
+}
+
+# 统一 Basic Auth：采集端 Web 页面共用认证。
+# 默认账号：vm_admin / CAO-hengyuan89
+# 修改密码：docker run --rm caddy:2.11.4-alpine caddy hash-password --plaintext '新密码'
+(common_auth) {
+    basic_auth bcrypt vm-collector {
+        vm_admin $2a$14$9dzNYhVKAKprZ0sEhfVqYOXELAk1Pq7JNBxhwliEKe71/zCW4qd/a
+    }
+}
+
+(common_headers) {
+    header {
+        # 尽量不暴露反向代理软件信息；这不能保证所有安全扫描都无法指纹识别。
+        -Server
+        -Via
+        -X-Powered-By
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy no-referrer
+    }
+}
+
+(collector_routes) {
+    route {
+        import common_headers
+        import common_auth
+        encode zstd gzip
+
+        respond / "vmagent collector is running" 200
+        redir /vmagent /vmagent/ 302
+        redir /blackbox /blackbox/ 302
+
+        # vmagent：targets、metrics、reload 等。
+        handle_path /vmagent/* {
+            reverse_proxy vmagent:8429 {
+                header_down -Server
+                header_down -X-Powered-By
+            }
+        }
+
+        # Blackbox Exporter 页面。
+        handle_path /blackbox/* {
+            reverse_proxy blackbox-exporter:9115 {
+                header_down -Server
+                header_down -X-Powered-By
+            }
+        }
+
+        # SNMP Exporter 页面使用 /config、/metrics、/snmp 等绝对路径。
+        @snmp_paths {
+            path /snmp /snmp/* /config /metrics
+        }
+        handle @snmp_paths {
+            reverse_proxy snmp-exporter:9116 {
+                header_down -Server
+                header_down -X-Powered-By
+            }
+        }
+    }
+}
+
+# HTTP 入口保留为注释；如需启用，在 docker-compose.yml 中取消 29080 端口注释。
+# :8080 {
+#     import collector_routes
+# }
+
+:8443 {
+    # 使用项目自带自签证书；浏览器未信任该证书时会提示不安全。
+    tls /etc/caddy/caddy-selfsigned.crt /etc/caddy/caddy-selfsigned.key
+    import collector_routes
+}

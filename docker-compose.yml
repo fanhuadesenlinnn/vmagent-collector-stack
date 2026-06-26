@@ -1,0 +1,116 @@
+# Docker Compose 采集端：vmagent + Exporters + Caddy
+# 说明：不使用 .env 文件；ops.sh 会导出 MONITOR_UID/MONITOR_GID 和 REMOTE_WRITE_URL。
+# 默认入口：https://服务器IP:29088/ ，使用项目自带自签证书，浏览器提示不安全属正常现象。
+
+name: vmagent-collector
+
+x-common: &common
+  restart: unless-stopped
+  networks:
+    - collector
+  # 非 root 部署：默认使用当前用户 UID/GID。
+  user: "${MONITOR_UID:-1000}:${MONITOR_GID:-1000}"
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "3"
+
+services:
+  caddy:
+    <<: *common
+    image: caddy:2.11.4-alpine
+    container_name: collector-caddy
+    # 默认只开放 HTTPS 统一入口；HTTP 入口保留注释。
+    ports:
+      # - "29080:8080"  # HTTP 明文入口，默认不暴露；需要时取消注释
+      - "29088:8443"
+    volumes:
+      - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./config/caddy-selfsigned.crt:/etc/caddy/caddy-selfsigned.crt:ro
+      - ./config/caddy-selfsigned.key:/etc/caddy/caddy-selfsigned.key:ro
+      - ./data/caddy/data:/data
+      - ./data/caddy/config:/config
+    depends_on:
+      vmagent:
+        condition: service_started
+      blackbox-exporter:
+        condition: service_started
+      snmp-exporter:
+        condition: service_started
+
+  vmagent:
+    <<: *common
+    image: victoriametrics/vmagent:v1.146.0
+    container_name: collector-vmagent
+    command:
+      # Prometheus 兼容采集配置。
+      - -promscrape.config=/etc/vmagent/vmagent.yml
+      # 自动检查采集配置和 file_sd targets 文件变化。
+      - -promscrape.configCheckInterval=30s
+      - -promscrape.fileSDCheckInterval=30s
+      # 写入远端 VictoriaMetrics；由 ops.sh 通过 REMOTE_WRITE_URL 注入。
+      - -remoteWrite.url=${REMOTE_WRITE_URL}
+      # 远端短时不可用时，先写入本地队列缓存。
+      - -remoteWrite.tmpDataPath=/vmagent-data
+      - -remoteWrite.maxDiskUsagePerURL=1GB
+      - -httpListenAddr=:8429
+    volumes:
+      - ./config/vmagent.yml:/etc/vmagent/vmagent.yml:ro
+      - ./targets:/etc/vmagent/targets:ro
+      - ./data/vmagent:/vmagent-data
+    depends_on:
+      node-exporter:
+        condition: service_started
+      blackbox-exporter:
+        condition: service_started
+      snmp-exporter:
+        condition: service_started
+    extra_hosts:
+      # Linux 下让容器可访问宿主机；用于采集宿主机上已有 exporter 时很方便。
+      - "host.docker.internal:host-gateway"
+
+  node-exporter:
+    <<: *common
+    image: prom/node-exporter:v1.11.1-distroless
+    container_name: collector-node-exporter
+    command:
+      # 容器化采集宿主机指标；挂载只读，避免写宿主机。
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host/root
+      - --web.listen-address=:9100
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|run/docker/netns|var/lib/docker/.+)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+
+  blackbox-exporter:
+    <<: *common
+    image: prom/blackbox-exporter:v0.28.0
+    container_name: collector-blackbox-exporter
+    # ICMP 模块需要原始套接字能力；仍然保持非 root 用户运行。
+    cap_add:
+      - NET_RAW
+    command:
+      - --config.file=/etc/blackbox_exporter/blackbox.yml
+      - --web.listen-address=:9115
+    volumes:
+      - ./config/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro
+
+  snmp-exporter:
+    <<: *common
+    image: prom/snmp-exporter:v0.30.1
+    container_name: collector-snmp-exporter
+    command:
+      - --config.file=/etc/snmp_exporter/snmp.yml
+      - --web.listen-address=:9116
+    volumes:
+      - ./config/snmp.yml:/etc/snmp_exporter/snmp.yml:ro
+
+networks:
+  collector:
+    driver: bridge

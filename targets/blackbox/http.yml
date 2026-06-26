@@ -1,0 +1,6 @@
+# HTTP/HTTPS 黑盒探测动态目标示例。
+- targets:
+    - https://example.com
+  labels:
+    group: public
+    module: http_2xx

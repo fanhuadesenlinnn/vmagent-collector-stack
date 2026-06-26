@@ -1,0 +1,67 @@
+# vmagent 采集配置：Prometheus 风格，兼容 file_sd_configs。
+# 修改 targets 目录中的文件后执行：./ops.sh reload
+# 数据通过 docker-compose.yml 中的 REMOTE_WRITE_URL 写入远端 VictoriaMetrics。
+
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  external_labels:
+    monitor: vmagent-collector
+
+scrape_configs:
+  # 采集采集端自身组件。
+  - job_name: self
+    static_configs:
+      - targets:
+          - vmagent:8429
+          - node-exporter:9100
+          - blackbox-exporter:9115
+          - snmp-exporter:9116
+        labels:
+          group: collector
+
+  # 动态发现 node-exporter 节点；文件格式见 targets/node/*.yml。
+  - job_name: node-exporter
+    file_sd_configs:
+      - files:
+          - /etc/vmagent/targets/node/*.yml
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # 黑盒探测统一入口；通过 targets/blackbox/*.yml 里的 module 标签选择模块。
+  - job_name: blackbox
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    file_sd_configs:
+      - files:
+          - /etc/vmagent/targets/blackbox/*.yml
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [module]
+        regex: (.+)
+        target_label: __param_module
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # SNMP 设备采集；通过标签 module/auth 选择 snmp.yml 中的模块和认证。
+  - job_name: snmp
+    metrics_path: /snmp
+    file_sd_configs:
+      - files:
+          - /etc/vmagent/targets/snmp/*.yml
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [module]
+        target_label: __param_module
+      - source_labels: [auth]
+        target_label: __param_auth
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: snmp-exporter:9116
