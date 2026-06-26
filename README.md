@@ -22,6 +22,16 @@ REMOTE_WRITE_URL='http://远端服务器IP:8428/api/v1/write' ./ops.sh up
 REMOTE_WRITE_URL='http://远端服务器IP:28087/api/v1/write' ./ops.sh up
 ```
 
+如果远端走主监控项目 Caddy HTTPS 入口，并使用 `vm_remote` 认证：
+
+```bash
+REMOTE_WRITE_URL='https://远端服务器IP:28088/vm/api/v1/write' \
+REMOTE_WRITE_USER='vm_remote' \
+REMOTE_WRITE_PASSWORD='vm_remote_PASSWD' \
+REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true \
+./ops.sh up
+```
+
 启动后访问采集端 Web 入口：
 
 ```text
@@ -107,11 +117,21 @@ http://远端服务器IP:28087/api/v1/write
 
 然后用防火墙、安全组或来源 IP 限制，只允许采集端访问。这样 vmagent 配置最简单，也避免自签 HTTPS 和 Basic Auth 对 remote_write 的额外影响。
 
-如果必须走远端 Caddy HTTPS 入口，需要在 `docker-compose.yml` 里为 vmagent 增加 remote_write 的认证和证书相关参数，再把 `REMOTE_WRITE_URL` 指向：
+如果走远端 Caddy HTTPS 入口，把 `REMOTE_WRITE_URL` 指向：
 
 ```text
 https://远端服务器IP:28088/vm/api/v1/write
 ```
+
+并设置：
+
+```text
+REMOTE_WRITE_USER='vm_remote'
+REMOTE_WRITE_PASSWORD='vm_remote_PASSWD'
+REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true
+```
+
+`REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true` 用于远端 Caddy 使用自签证书的场景。如果远端使用受信任证书，可以改成 `false` 或不设置。
 
 ## 非 root 部署
 
