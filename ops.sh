@@ -73,19 +73,46 @@ generate_selfsigned_cert() {
   local crt="config/caddy-selfsigned.crt" key="config/caddy-selfsigned.key"
   [[ -f "${crt}" && -f "${key}" ]] && return 0
   command -v openssl >/dev/null 2>&1 || {
-    err "未找到 openssl，无法生成自签证书"
-    exit 1
+    warn "未找到 openssl；可手动使用内置隐藏备用证书："
+    warn "  cp config/.caddy-selfsigned.crt config/caddy-selfsigned.crt"
+    warn "  cp config/.caddy-selfsigned.key config/caddy-selfsigned.key"
+    return 1
   }
+  if [[ ! -f "config/.caddy-selfsigned.crt" || ! -f "config/.caddy-selfsigned.key" ]]; then
+    warn "未找到隐藏备用证书 config/.caddy-selfsigned.*；建议保留备用文件，方便离线机器初始化"
+  fi
   log "生成自签证书（有效期 10 年）..."
-  openssl req -x509 -newkey rsa:2048 \
-    -keyout "${key}" \
-    -out "${crt}" \
-    -days 3650 -nodes \
-    -subj "/CN=vmagent-collector" \
-    -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" \
-    2>/dev/null
+  if ! openssl req -x509 -newkey rsa:2048 \
+      -keyout "${key}" \
+      -out "${crt}" \
+      -days 3650 -nodes \
+      -subj "/CN=vmagent-collector" \
+      -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" \
+      2>/dev/null; then
+    warn "自签证书生成失败；可手动使用内置隐藏备用证书："
+    warn "  cp config/.caddy-selfsigned.crt config/caddy-selfsigned.crt"
+    warn "  cp config/.caddy-selfsigned.key config/caddy-selfsigned.key"
+    return 1
+  fi
   chmod 600 "${key}"
   ok "自签证书已生成：${crt}"
+}
+
+ensure_selfsigned_cert() {
+  local crt="config/caddy-selfsigned.crt" key="config/caddy-selfsigned.key"
+  [[ -f "${crt}" && -f "${key}" ]] && return 0
+  if generate_selfsigned_cert; then
+    return 0
+  fi
+  if [[ -f "config/.caddy-selfsigned.crt" && -f "config/.caddy-selfsigned.key" ]]; then
+    cp config/.caddy-selfsigned.crt "${crt}"
+    cp config/.caddy-selfsigned.key "${key}"
+    chmod 600 "${key}"
+    ok "已使用隐藏备用自签证书：config/.caddy-selfsigned.*"
+    return 0
+  fi
+  err "缺少自签证书，且无法生成或使用隐藏备用证书"
+  exit 1
 }
 
 http_post() {
@@ -331,7 +358,7 @@ case "${cmd}" in
   up)
     require_remote_write_url
     prepare_dirs
-    generate_selfsigned_cert
+    ensure_selfsigned_cert
     log "拉取镜像；离线环境会自动使用本地已有镜像继续启动"
     compose pull || warn "镜像拉取失败，继续尝试使用本地已有镜像启动"
     log "启动采集端服务"

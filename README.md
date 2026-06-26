@@ -58,7 +58,9 @@ vm_admin / CAO-hengyuan89
 │   ├── blackbox.yml
 │   ├── snmp.yml
 │   ├── caddy-selfsigned.crt
-│   └── caddy-selfsigned.key
+│   ├── caddy-selfsigned.key
+│   ├── .caddy-selfsigned.crt
+│   └── .caddy-selfsigned.key
 ├── targets
 │   ├── node
 │   ├── blackbox
@@ -78,6 +80,24 @@ https://服务器IP:29088/snmp/      SNMP Exporter
 ```
 
 默认只开放 HTTPS `29088`。HTTP `29080` 已在 `docker-compose.yml` 中保留注释，需要时可取消注释。
+
+## HTTPS 自签证书
+
+`ops.sh up` 会优先自动生成：
+
+```text
+config/caddy-selfsigned.crt
+config/caddy-selfsigned.key
+```
+
+如果离线机器没有 `openssl`，或证书生成失败，可以手动使用项目内置隐藏备用证书：
+
+```bash
+cp config/.caddy-selfsigned.crt config/caddy-selfsigned.crt
+cp config/.caddy-selfsigned.key config/caddy-selfsigned.key
+```
+
+浏览器提示证书不受信任是正常现象，继续访问即可。
 
 ## 常用命令
 
