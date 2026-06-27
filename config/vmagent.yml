@@ -1,6 +1,6 @@
 # vmagent 采集配置：Prometheus 风格，兼容 file_sd_configs。
 # 修改 targets 目录中的文件后执行：./ops.sh reload
-# 数据通过 docker-compose.yml 中的 REMOTE_WRITE_URL 写入远端 VictoriaMetrics。
+# 数据通过 docker-compose.yml 中的 -remoteWrite.url 写入远端 VictoriaMetrics。
 
 global:
   scrape_interval: 30s

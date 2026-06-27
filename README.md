@@ -10,26 +10,25 @@ Caddy + vmagent + node-exporter + blackbox-exporter + snmp-exporter
 
 ## 一条命令启动
 
-先确认远端 VictoriaMetrics 的写入地址。例如远端直接暴露 VictoriaMetrics：
+先在 `docker-compose.yml` 中修改 `vmagent` 的远端写入地址：
 
-```bash
-REMOTE_WRITE_URL='http://远端服务器IP:8428/api/v1/write' ./ops.sh up
+```yaml
+- -remoteWrite.url=http://远端服务器IP:28087/api/v1/write
 ```
 
-如果远端是主监控项目里预留的 `28087` 裸入口：
+然后启动：
 
 ```bash
-REMOTE_WRITE_URL='http://远端服务器IP:28087/api/v1/write' ./ops.sh up
-```
-
-如果远端走主监控项目 Caddy HTTPS 入口，并使用 `vm_remote` 认证：
-
-```bash
-REMOTE_WRITE_URL='https://远端服务器IP:28088/vm/api/v1/write' \
-REMOTE_WRITE_USER='vm_remote' \
-REMOTE_WRITE_PASSWORD='vm_remote_PASSWD' \
-REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true \
 ./ops.sh up
+```
+
+如果远端走主监控项目 Caddy HTTPS 入口，并使用 `vm_remote` 认证，就在 `docker-compose.yml` 中改成：
+
+```yaml
+- -remoteWrite.url=https://远端服务器IP:28088/vm/api/v1/write
+- -remoteWrite.basicAuth.username=vm_remote
+- -remoteWrite.basicAuth.password=vm_remote_PASSWD
+- -remoteWrite.tlsInsecureSkipVerify=true
 ```
 
 启动后访问采集端 Web 入口：
@@ -137,21 +136,21 @@ http://远端服务器IP:28087/api/v1/write
 
 然后用防火墙、安全组或来源 IP 限制，只允许采集端访问。这样 vmagent 配置最简单，也避免自签 HTTPS 和 Basic Auth 对 remote_write 的额外影响。
 
-如果走远端 Caddy HTTPS 入口，把 `REMOTE_WRITE_URL` 指向：
+如果走远端 Caddy HTTPS 入口，把 `docker-compose.yml` 里的 `-remoteWrite.url` 改成：
 
 ```text
 https://远端服务器IP:28088/vm/api/v1/write
 ```
 
-并设置：
+并启用/设置：
 
 ```text
-REMOTE_WRITE_USER='vm_remote'
-REMOTE_WRITE_PASSWORD='vm_remote_PASSWD'
-REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true
+-remoteWrite.basicAuth.username=vm_remote
+-remoteWrite.basicAuth.password=vm_remote_PASSWD
+-remoteWrite.tlsInsecureSkipVerify=true
 ```
 
-`REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true` 用于远端 Caddy 使用自签证书的场景。如果远端使用受信任证书，可以改成 `false` 或不设置。
+`-remoteWrite.tlsInsecureSkipVerify=true` 用于远端 Caddy 使用自签证书的场景。如果远端使用受信任证书，可以改成 `false`。
 
 ## 非 root 部署
 
@@ -160,7 +159,7 @@ REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true
 ```bash
 su - monitor
 cd vmagent-collector-stack
-REMOTE_WRITE_URL='http://远端服务器IP:28087/api/v1/write' ./ops.sh up
+./ops.sh up
 ```
 
 ## 离线部署

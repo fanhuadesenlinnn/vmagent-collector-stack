@@ -13,10 +13,6 @@ export MONITOR_GID="${MONITOR_GID:-$(id -g)}"
 WEB_URL="${WEB_URL:-https://127.0.0.1:29088}"
 BASIC_USER="${BASIC_USER:-vm_admin}"
 BASIC_PASS="${BASIC_PASS:-CAO-hengyuan89}"
-REMOTE_WRITE_URL="${REMOTE_WRITE_URL:-}"
-REMOTE_WRITE_USER="${REMOTE_WRITE_USER:-}"
-REMOTE_WRITE_PASSWORD="${REMOTE_WRITE_PASSWORD:-}"
-REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY="${REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY:-false}"
 TARGET_FORCE=0
 
 log() { printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
@@ -44,29 +40,6 @@ prepare_dirs() {
     targets/blackbox \
     targets/snmp
   chmod -R u+rwX data targets || true
-}
-
-require_remote_write_url() {
-  if [[ -z "${REMOTE_WRITE_URL}" ]]; then
-    err "请先指定远端 VictoriaMetrics 写入地址，例如："
-    err "  REMOTE_WRITE_URL='http://远端服务器IP:8428/api/v1/write' ./ops.sh up"
-    err "如果远端通过当前主项目 Caddy 暴露，可以写成："
-    err "  REMOTE_WRITE_URL='https://远端服务器IP:28088/vm/api/v1/write' REMOTE_WRITE_USER='vm_remote' REMOTE_WRITE_PASSWORD='vm_remote_PASSWD' REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true ./ops.sh up"
-    exit 1
-  fi
-  if [[ -n "${REMOTE_WRITE_USER}" && -z "${REMOTE_WRITE_PASSWORD}" ]]; then
-    err "已设置 REMOTE_WRITE_USER，但 REMOTE_WRITE_PASSWORD 为空"
-    exit 1
-  fi
-  if [[ -z "${REMOTE_WRITE_USER}" && -n "${REMOTE_WRITE_PASSWORD}" ]]; then
-    err "已设置 REMOTE_WRITE_PASSWORD，但 REMOTE_WRITE_USER 为空"
-    exit 1
-  fi
-  case "${REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY}" in
-    true|false) ;;
-    *) err "REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY 只能是 true 或 false"; exit 1 ;;
-  esac
-  export REMOTE_WRITE_URL REMOTE_WRITE_USER REMOTE_WRITE_PASSWORD REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY
 }
 
 generate_selfsigned_cert() {
@@ -345,8 +318,8 @@ usage() {
   add-snmp [--force] <name> <ip> [module] [auth] [group]
 
 示例：
-  REMOTE_WRITE_URL='http://远端服务器IP:8428/api/v1/write' ./ops.sh up
-  REMOTE_WRITE_URL='https://远端服务器IP:28088/vm/api/v1/write' REMOTE_WRITE_USER='vm_remote' REMOTE_WRITE_PASSWORD='vm_remote_PASSWD' REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true ./ops.sh up
+  先在 docker-compose.yml 中修改 -remoteWrite.url，然后执行：
+  ./ops.sh up
   ./ops.sh add-node web01 10.0.0.11:9100 prod web
   ./ops.sh add-http api https://api.example.com prod
 EOF
@@ -356,7 +329,6 @@ cmd="${1:-usage}"
 shift || true
 case "${cmd}" in
   up)
-    require_remote_write_url
     prepare_dirs
     ensure_selfsigned_cert
     log "拉取镜像；离线环境会自动使用本地已有镜像继续启动"
@@ -375,7 +347,6 @@ case "${cmd}" in
       restart_usage
       exit 0
     fi
-    require_remote_write_url
     if [[ "${1}" == "all" ]]; then
       compose restart
     else
@@ -392,10 +363,6 @@ case "${cmd}" in
     reload_all
     ;;
   check)
-    REMOTE_WRITE_URL="${REMOTE_WRITE_URL:-http://example.invalid:8428/api/v1/write}" \
-    REMOTE_WRITE_USER="${REMOTE_WRITE_USER:-}" \
-    REMOTE_WRITE_PASSWORD="${REMOTE_WRITE_PASSWORD:-}" \
-    REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY="${REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY:-false}" \
     compose config >/dev/null
     validate_caddyfile
     ok "配置检查通过"

@@ -1,5 +1,5 @@
 # Docker Compose 采集端：vmagent + Exporters + Caddy
-# 说明：不使用 .env 文件；ops.sh 会导出 MONITOR_UID/MONITOR_GID 和 REMOTE_WRITE_*。
+# 说明：不使用 .env 文件；远端写入地址直接在本文件 vmagent command 中修改。
 # 默认入口：https://服务器IP:29088/ ，使用项目自带自签证书，浏览器提示不安全属正常现象。
 
 name: vmagent-collector
@@ -51,13 +51,13 @@ services:
       # 自动检查采集配置和 file_sd targets 文件变化。
       - -promscrape.configCheckInterval=30s
       - -promscrape.fileSDCheckInterval=30s
-      # 写入远端 VictoriaMetrics；由 ops.sh 通过 REMOTE_WRITE_URL 注入。
-      - -remoteWrite.url=${REMOTE_WRITE_URL}
-      # 如远端 VictoriaMetrics 通过 Caddy Basic Auth 暴露，可通过 REMOTE_WRITE_USER/PASSWORD 注入。
-      - -remoteWrite.basicAuth.username=${REMOTE_WRITE_USER:-}
-      - -remoteWrite.basicAuth.password=${REMOTE_WRITE_PASSWORD:-}
-      # 远端 Caddy 使用自签 HTTPS 时可设置 REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY=true。
-      - -remoteWrite.tlsInsecureSkipVerify=${REMOTE_WRITE_TLS_INSECURE_SKIP_VERIFY:-false}
+      # 写入远端 VictoriaMetrics；按实际远端地址修改这里。
+      - -remoteWrite.url=http://REMOTE_SERVER_IP:28087/api/v1/write
+      # 如远端 VictoriaMetrics 通过 Caddy Basic Auth 暴露，取消下面两行注释并修改账号密码。
+      # - -remoteWrite.basicAuth.username=vm_remote
+      # - -remoteWrite.basicAuth.password=vm_remote_PASSWD
+      # 远端 Caddy 使用自签 HTTPS 时改成 true。
+      - -remoteWrite.tlsInsecureSkipVerify=false
       # 远端短时不可用时，先写入本地队列缓存。
       - -remoteWrite.tmpDataPath=/vmagent-data
       - -remoteWrite.maxDiskUsagePerURL=1GB
